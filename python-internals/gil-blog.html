@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The GIL isn't so bad after all</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,wght@0,300;0,600;1,300&family=Inter:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #13161d;
+      --border: #1e2330;
+      --text: #c9cdd8;
+      --muted: #606578;
+      --accent: #5c9fff;
+      --accent-dim: rgba(92, 159, 255, 0.12);
+      --green: #4ecb71;
+      --red: #f07070;
+      --yellow: #e8c96d;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'Inter', system-ui, sans-serif;
+      --font-code: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.75;
+      padding: 0 1rem;
+    }
+
+    .wrapper {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 4rem 0 6rem;
+    }
+
+    .hero {
+      margin-bottom: 3.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2.5rem;
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-code);
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 600;
+      line-height: 1.15;
+      color: #e8eaf2;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-sub {
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-family: var(--font-code);
+    }
+
+    p {
+      margin-bottom: 1.3rem;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 1.55rem;
+      font-weight: 600;
+      color: #e0e3ee;
+      margin: 2.8rem 0 0.9rem;
+      padding-top: 0.5rem;
+    }
+
+    h3 {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 300;
+      font-style: italic;
+      color: var(--accent);
+      margin: 2rem 0 0.6rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    li {
+      margin-left: 1.4rem;
+      margin-bottom: 0.3rem;
+    }
+
+    ul {
+      margin-bottom: 1.2rem;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 1.5rem 0;
+      overflow: hidden;
+      font-family: var(--font-code);
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: var(--border);
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .code-header .lang-badge {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-family: var(--font-code);
+      font-size: 0.68rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .copy-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .copy-btn.copied {
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    pre {
+      padding: 1.2rem 1.4rem;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.65;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Syntax tokens */
+    .kw {
+      color: #c792ea;
+    }
+
+    .ty {
+      color: #82aaff;
+    }
+
+    .fn {
+      color: #82cfff;
+    }
+
+    .str {
+      color: #c3e88d;
+    }
+
+    .num {
+      color: var(--yellow);
+    }
+
+    .cmt {
+      color: #546e7a;
+      font-style: italic;
+    }
+
+    .inc {
+      color: #f07178;
+    }
+
+    .py-kw {
+      color: #c792ea;
+    }
+
+    .py-fn {
+      color: #82aaff;
+    }
+
+    .py-str {
+      color: #c3e88d;
+    }
+
+    .py-num {
+      color: var(--yellow);
+    }
+
+    .py-cmt {
+      color: #546e7a;
+      font-style: italic;
+    }
+
+    .py-builtin {
+      color: #ffcb6b;
+    }
+
+    /* Inline code */
+    code {
+      font-family: var(--font-code);
+      font-size: 0.82em;
+      background: var(--accent-dim);
+      color: #a8d4ff;
+      padding: 0.15em 0.45em;
+      border-radius: 4px;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    /* Output blocks */
+    .output-block {
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      border-radius: 0 8px 8px 0;
+      margin: 1rem 0 1.5rem;
+      padding: 1rem 1.2rem;
+      font-family: var(--font-code);
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: #9fb8a0;
+      overflow-x: auto;
+      white-space: pre;
+      white-space: pre-line;
+    }
+
+    .output-block.error {
+      border-left-color: var(--red);
+      color: #c09898;
+    }
+
+    .output-block .ok {
+      color: var(--green);
+    }
+
+    .output-block .err {
+      color: var(--red);
+    }
+
+    .output-block .dim {
+      color: var(--muted);
+    }
+
+    /* Callout */
+    .callout {
+      background: var(--accent-dim);
+      border: 1px solid rgba(92, 159, 255, 0.25);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.2rem;
+      margin: 1.5rem 0;
+      font-size: 0.92rem;
+      color: #b0c8ee;
+    }
+
+    .callout strong {
+      color: var(--accent);
+    }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-family: var(--font-code);
+    }
+
+    footer a {
+      color: var(--muted);
+    }
+
+    @media (max-width: 500px) {
+      body {
+        font-size: 15px;
+      }
+
+      .wrapper {
+        padding: 2rem 0 4rem;
+      }
+
+      pre {
+        font-size: 0.73rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+
+    <header class="hero">
+      <div class="hero-eyebrow">Deep Dive · Python Internals · Part 1</div>
+      <h1>The GIL isn't so bad after all</h1>
+      <p class="hero-sub">A deep dive into what the CPython's Global Interpreter Lock solves.</p>
+    </header>
+
+    <p>It's the year 1992. Every computer runs with a single core. A new programming paradigm called threading is
+      gaining traction. Guido Van Rossum faces a challenge: he needs to make changes in CPython so that developers can
+      use multithreading safely. He must come up with a solution so that the interpreter can safely share memory between
+      multiple threads. He introduces the <strong>Global Interpreter Lock</strong>, or the GIL.</p>
+
+    <p>Few years pass, and chip manufacturers realise they can expedite compute by adding multiple cores on a single
+      machine. However, python developers realise that the GIL prohibits parallel execution of Python code across
+      multiple cores by a
+      single Python process. Unfortunately, what was once an elegant solution to enable threading becomes a ceiling for
+      performance.</p>
+
+    <p>Python is infamous for the GIL. But it solves a key problem. Before multiple cores became a thing, it was
+      probably the simplest solution to support threading. In this post, we'll explore why the GIL exists, what problem
+      it solves, and why it may not be as bad as its reputation suggests.</p>
+
+    <div class="callout">
+      <strong>Note:</strong> Python is just a language. There are multiple interpreters that can run code written in the
+      Python language. <strong>CPython</strong> is the most commonly used interpreter, and we'll focus on that.
+    </div>
+
+    <h2>How CPython manages memory</h2>
+
+    <p>To begin, we need to understand how CPython manages memory. If you've programmed in a low-level language like C,
+      you must be familiar with the <strong>stack</strong> and the <strong>heap</strong>. They are two distinct regions
+      in
+      memory.</p>
+
+    <p>The stack holds local variables used in a function. It is a Last-In-First-Out (LIFO) structure. Whenever a
+      function is called, its local variables and return address are pushed onto the stack. When the function returns,
+      all this data is popped. The CPU and compiler automatically manage the stack. On many Linux systems, a thread's
+      stack is limited to roughly 8 MB by default.</p>
+
+    <p>The heap, on the other hand, is a large pool of memory managed by the C programmer. The programmer requests
+      memory from the heap to store data, and that data exists until they free it. It's ideal for data that needs
+      to persist across multiple functions, and for data structures whose size is determined at runtime.</p>
+
+    <p>
+      If you've only programmed in python, or other high level languages, you are unlikely to have managed memory. So
+      who is
+      managing it?
+    </p>
+
+    <p>
+      In 'C', int x = 20, stores the value as 4 bytes on the stack.
+    </p>
+
+    <div style="margin:2rem 0;">
+      <canvas id="diag1" width="320" height="260" style="display:block;margin:0 auto;border-radius:10px;"></canvas>
+    </div>
+    <script>
+      (function () {
+        const c = document.getElementById('diag1');
+        const ctx = c.getContext('2d');
+        const BG = '#0d0f14', SURFACE = '#13161d', BORDER = '#1e2330';
+        const TEXT = '#c9cdd8', MUTED = '#606578', ACCENT = '#5c9fff';
+        const MONO = "13px 'JetBrains Mono', monospace";
+        const SANS = "13px 'Inter', sans-serif";
+
+        // background
+        ctx.fillStyle = BG;
+        ctx.fillRect(0, 0, 320, 260);
+
+        // label: C: int x = 2781
+        ctx.fillStyle = TEXT;
+        ctx.font = MONO;
+        ctx.textAlign = 'center';
+        ctx.fillText('C: int x = 2781', 160, 24);
+
+        // outer card
+        ctx.fillStyle = SURFACE;
+        roundRect(ctx, 20, 36, 230, 200, 12, SURFACE, BORDER);
+
+        // header: Stack
+        ctx.fillStyle = '#e8eaf2';
+        ctx.font = "bold 16px 'Inter', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText('Stack', 135, 68);
+
+        // divider
+        ctx.strokeStyle = BORDER;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(20, 78); ctx.lineTo(250, 78); ctx.stroke();
+
+        // cell: x (2781)
+        ctx.fillStyle = SURFACE;
+        ctx.fillRect(21, 79, 228, 70);
+        ctx.fillStyle = '#e8eaf2';
+        ctx.font = "bold 14px 'Inter', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText('x (2781)', 135, 107);
+        ctx.fillStyle = MUTED;
+        ctx.font = SANS;
+        ctx.fillText('4 bytes · int', 135, 126);
+
+        // divider 2
+        ctx.strokeStyle = BORDER;
+        ctx.beginPath(); ctx.moveTo(20, 149); ctx.lineTo(250, 149); ctx.stroke();
+
+        // dots cell
+        ctx.fillStyle = MUTED;
+        ctx.font = "18px 'Inter', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText('···', 135, 185);
+
+        // address labels
+        ctx.fillStyle = MUTED;
+        ctx.font = MONO;
+        ctx.textAlign = 'left';
+        ctx.fillText('0x1000', 258, 84);
+        ctx.fillText('0x1003', 258, 154);
+
+        // tick marks
+        ctx.strokeStyle = MUTED;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(252, 79); ctx.lineTo(256, 79); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(252, 149); ctx.lineTo(256, 149); ctx.stroke();
+
+        function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + w - r, y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+          ctx.lineTo(x + w, y + h - r);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+          ctx.lineTo(x + r, y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+          if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+          if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+        }
+      })();
+    </script>
+
+    <p>In Python, integers are wrapped in a <code>PyLongObject</code> struct. A variable like <code>x</code> is just
+      a name bound to some object sitting on the heap. Internally, CPython maintains mappings from variable names to the
+      object location.
+      The struct contains:</p>
+
+    <ul>
+      <li><code>ob_type</code> — a pointer to a <code>PyTypeObject</code> describing the type</li>
+      <li><code>ob_refcnt</code> — the reference count</li>
+      <li><code>ob_size</code> — number of "digits" used to store the value</li>
+      <li><code>ob_digit</code> — the actual integer value</li>
+    </ul>
+
+    <div style="margin:2rem 0;">
+      <canvas id="diagPyLong" width="560" height="280"
+        style="display:block;margin:0 auto;border-radius:10px;max-width:100%;"></canvas>
+    </div>
+    <script>
+      (function () {
+        const c = document.getElementById('diagPyLong');
+        const ctx = c.getContext('2d');
+        const W = 560, H = 280;
+        const BG = '#0d0f14', SURFACE = '#13161d', BORDER = '#1e2330';
+        const TEXT = '#c9cdd8', MUTED = '#606578', ACCENT = '#5c9fff';
+        const GREEN = '#4ecb71', YELLOW = '#e8c96d';
+        const MONO = "12px 'JetBrains Mono', monospace";
+        const MONO_SM = "11px 'JetBrains Mono', monospace";
+
+        ctx.fillStyle = BG;
+        ctx.fillRect(0, 0, W, H);
+
+        // ── helpers ──────────────────────────────────────────
+        function rr(x, y, w, h, r, fill, stroke) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+          ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+          ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+          ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+          if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+          if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke(); }
+        }
+
+        function txt(t, x, y, font, color, align) {
+          ctx.fillStyle = color || TEXT;
+          ctx.font = font || MONO;
+          ctx.textAlign = align || 'left';
+          ctx.fillText(t, x, y);
+        }
+
+        function div(x, y, w) {
+          ctx.strokeStyle = BORDER;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.stroke();
+        }
+
+        function arrow(x1, y1, x2, y2, color) {
+          ctx.save();
+          ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          const a = Math.atan2(y2 - y1, x2 - x1);
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(x2 - 8 * Math.cos(a - 0.4), y2 - 8 * Math.sin(a - 0.4));
+          ctx.lineTo(x2 - 8 * Math.cos(a + 0.4), y2 - 8 * Math.sin(a + 0.4));
+          ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+
+        // ── LEFT: namespace box ───────────────────────────────
+        // label
+        txt('namespace', 20, 22, MONO_SM, MUTED);
+
+        rr(20, 30, 160, 64, 8, SURFACE, BORDER);
+        txt('globals()', 100, 50, "bold 13px 'Inter',sans-serif", '#e8eaf2', 'center');
+        div(20, 56, 160);
+        txt('"x"  →  0x7f3a', 30, 76, MONO, ACCENT);
+
+        // ── ARROW ─────────────────────────────────────────────
+        arrow(180, 62, 270, 62, ACCENT);
+
+        // label above arrow
+        txt('pointer to heap', 225, 52, MONO_SM, MUTED, 'center');
+
+        // ── RIGHT: PyLongObject on heap ───────────────────────
+        const bx = 270, by = 20, bw = 250, rowH = 36;
+        const fields = [
+          { label: 'ob_type', val: '→ PyTypeObject (int)', color: TEXT },
+          { label: 'ob_refcnt', val: 'ref count: 1', color: GREEN },
+          { label: 'ob_size', val: 'digits used: 1', color: YELLOW },
+          { label: 'ob_digit', val: 'value: 2781', color: TEXT },
+        ];
+        const totalH = 28 + fields.length * rowH + 8;
+
+        rr(bx, by, bw, totalH, 8, SURFACE, BORDER);
+
+        // header
+        txt('PyLongObject', bx + bw / 2, by + 17, "bold 13px 'Inter',sans-serif", '#e8eaf2', 'center');
+        txt('@ 0x7f3a  ·  heap', bx + bw / 2, by + 30, MONO_SM, MUTED, 'center');
+        div(bx, by + 36, bw);
+
+        // rows
+        fields.forEach((f, i) => {
+          const ry = by + 36 + i * rowH;
+          // subtle row stripe
+          if (i % 2 === 1) {
+            ctx.fillStyle = 'rgba(255,255,255,0.02)';
+            ctx.fillRect(bx + 1, ry, bw - 2, rowH);
+          }
+          div(bx, ry + rowH, bw);
+          txt(f.label, bx + 14, ry + rowH / 2 + 4, "600 12px 'JetBrains Mono',monospace", ACCENT);
+          txt(f.val, bx + 105, ry + rowH / 2 + 4, MONO, f.color);
+        });
+
+        // ── heap label below ──────────────────────────────────
+        txt('heap', bx + bw / 2, by + totalH + 18, MONO_SM, MUTED, 'center');
+        // bracket under box
+        ctx.strokeStyle = BORDER; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bx + 20, by + totalH + 8);
+        ctx.lineTo(bx, by + totalH + 8);
+        ctx.lineTo(bx, by + totalH + 14);
+        ctx.moveTo(bx + bw - 20, by + totalH + 8);
+        ctx.lineTo(bx + bw, by + totalH + 8);
+        ctx.lineTo(bx + bw, by + totalH + 14);
+        ctx.stroke();
+
+      })();
+    </script>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="py-kw">import</span> sys
+x = <span class="py-num">2781</span>
+<span class="py-builtin">print</span>(sys.getsizeof(x))  <span class="py-cmt"># 28 bytes on a 64-bit system</span></code></pre>
+    </div>
+
+    <div class="output-block">28</div>
+
+    <p>
+      If you check size of the same integer value in python it's 7x larger than the native int in 'C'. The 28 bytes
+      store
+      the
+      actual value and all the corresponding metadata. That is the fee python charges to offer developers tremendous
+      flexibility.
+    </p>
+
+    <p>In C, if you declare <code>int x = 2781</code> and then write <code>x = "c"</code>, the compiler throws an error.
+      In Python, you can modify <code>x</code> to anything at runtime. Python simply switches <code>x</code> to point
+      to a different heap location:</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code>x = <span class="py-num">2781</span>
+<span class="py-builtin">print</span>(<span class="py-builtin">id</span>(x))
+x = <span class="py-str">"how do you like them apples"</span>
+<span class="py-builtin">print</span>(<span class="py-builtin">id</span>(x))</code></pre>
+    </div>
+
+    <div class="output-block">
+      4318596496
+      4318584688
+    </div>
+
+    <h3>Reference counting</h3>
+
+    <p>
+      Since all the data sits on the heap, CPython must track it and timely reclaim the memory to prevent heap
+      overlflow. To do so,
+      it takes help of the ref_count attribute of the <code>PyObject</code>.
+    </p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="py-kw">import</span> sys
+x = <span class="py-num">2781</span>
+<span class="py-builtin">print</span>(sys.getrefcount(x))  <span class="py-cmt"># 2 — getrefcount itself holds one ref</span>
+y = x
+<span class="py-builtin">print</span>(sys.getrefcount(x))  <span class="py-cmt"># 3</span>
+<span class="py-builtin">print</span>(<span class="py-builtin">id</span>(x))
+<span class="py-builtin">print</span>(<span class="py-builtin">id</span>(y))              <span class="py-cmt"># same address — same object</span></code></pre>
+    </div>
+
+    <div class="output-block">2
+      3
+      4318597424
+      4318597424</div>
+
+    <p>
+      If you set x=2781, we get a named reference <code>x</code> in the current namespace that points to a
+      <code>PyLongObject</code> on the heap. Next, if you
+      set y=x, CPython creates another reference <code>y</code> which points to the same <code>PyLongObject</code> as
+      <code>x</code>. You can confirm
+      this using the <code>id</code> method. The initial count,2, might be confuse you. Why is it not 1? Well, the
+      <code>getrefcount</code> method also creates a temporary reference. The crux, however, is that the ref-count of a
+      <code>PyObject</code>
+      increases whenever a new declared variable points to it. When a variable pointing to it is removed, CPython
+      decrements the ref_count. So, if you delete
+      <code>y</code> and print the refcount of <code>x</code> it will go back to its initial value, 2.
+    </p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="py-kw">del</span> y
+<span class="py-builtin">print</span>(sys.getrefcount(x))  <span class="py-cmt"># back to 2</span></code></pre>
+    </div>
+
+    <div class="output-block">2</div>
+
+    <p>
+      You don't necessarily have to delete <code>y</code>. You can also set it to some other string, and the refcount
+      still decreases, since y then
+      points to some other object.
+    </p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="py-kw">import</span> sys
+x = <span class="py-num">2781</span>
+<span class="py-builtin">print</span>(sys.getrefcount(x))
+y = x
+<span class="py-builtin">print</span>(sys.getrefcount(y))
+<span class="py-builtin">print</span>(sys.getrefcount(x))
+y = <span class="py-str">"how do you like them apples"</span>
+<span class="py-builtin">print</span>(sys.getrefcount(y))
+<span class="py-builtin">print</span>(sys.getrefcount(x))</code></pre>
+    </div>
+
+    <div class="output-block">2
+      3
+      3
+      2
+      2</div>
+
+    <div style="margin:2rem 0;overflow-x:auto;">
+      <canvas id="diag2" width="700" height="380"
+        style="display:block;margin:0 auto;border-radius:10px;max-width:100%;"></canvas>
+    </div>
+    <script>
+      (function () {
+        const c = document.getElementById('diag2');
+        const ctx = c.getContext('2d');
+        const W = 700, H = 380;
+        const BG = '#0d0f14', SURFACE = '#13161d', BORDER = '#1e2330';
+        const TEXT = '#c9cdd8', MUTED = '#606578', ACCENT = '#5c9fff';
+        const DIM = '#3a3f50', DIMTEXT = '#4a5060';
+        const MONO = "12px 'JetBrains Mono', monospace";
+        const SANS = "13px 'Inter', sans-serif";
+        const SANS_SM = "11px 'Inter', sans-serif";
+
+        ctx.fillStyle = BG;
+        ctx.fillRect(0, 0, W, H);
+
+        // ── helpers ──────────────────────────────────────────────
+        function rr(x, y, w, h, r, fill, stroke, alpha) {
+          ctx.save();
+          if (alpha !== undefined) ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+          ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+          ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+          ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+          if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+          if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke(); }
+          ctx.restore();
+        }
+
+        function label(txt, x, y, font, color, align) {
+          ctx.fillStyle = color || TEXT;
+          ctx.font = font || SANS;
+          ctx.textAlign = align || 'center';
+          ctx.fillText(txt, x, y);
+        }
+
+        function divider(x, y, w) {
+          ctx.strokeStyle = BORDER;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.stroke();
+        }
+
+        function arrow(x1, y1, x2, y2, color, dashed) {
+          ctx.save();
+          ctx.strokeStyle = color || TEXT;
+          ctx.fillStyle = color || TEXT;
+          ctx.lineWidth = 1.5;
+          if (dashed) ctx.setLineDash([4, 3]);
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          ctx.setLineDash([]);
+          // arrowhead
+          const angle = Math.atan2(y2 - y1, x2 - x1);
+          ctx.beginPath();
+          ctx.moveTo(x2, y2);
+          ctx.lineTo(x2 - 8 * Math.cos(angle - 0.4), y2 - 8 * Math.sin(angle - 0.4));
+          ctx.lineTo(x2 - 8 * Math.cos(angle + 0.4), y2 - 8 * Math.sin(angle + 0.4));
+          ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+
+        function card(x, y, w, title, lines, dimmed) {
+          const fill = dimmed ? '#0f111a' : SURFACE;
+          const stroke = dimmed ? DIM : BORDER;
+          const tc = dimmed ? DIMTEXT : '#e8eaf2';
+          const lc = dimmed ? DIMTEXT : MUTED;
+          rr(x, y, w, 24 + lines.length * 22 + 14, 8, fill, stroke);
+          label(title, x + w / 2, y + 16, "bold 13px 'Inter',sans-serif", tc);
+          divider(x, y + 24, w);
+          lines.forEach((l, i) => label(l, x + w / 2, y + 24 + 16 + (i * 22), MONO, lc));
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // LEFT SIDE — x = 2781
+        // ═══════════════════════════════════════════════════════
+        label('x = 2781', 130, 22, MONO, MUTED);
+
+        // globals() box
+        rr(20, 34, 140, 64, 8, SURFACE, ACCENT);
+        label('globals()', 90, 54, "bold 13px 'Inter',sans-serif", '#e8eaf2');
+        divider(20, 62, 140);
+        label('"x" → 0x108a3', 90, 80, MONO, MUTED);
+
+        // PyObject (active int)
+        card(200, 34, 130, 'PyObject', ['type: int', 'val: 2781', 'ref_ct: 1'], false);
+
+        // arrow globals → PyObject
+        arrow(160, 68, 200, 68, ACCENT);
+
+        // PyObject (ghost str, dashed border)
+        rr(200, 200, 130, 100, 8, '#0d0f14', DIM);
+        ctx.save(); ctx.globalAlpha = 0.45;
+        label('PyObject', 265, 218, "bold 13px 'Inter',sans-serif", TEXT);
+        divider(200, 224, 130);
+        label('type: str', 265, 243, MONO, MUTED);
+        label('val: "how..."', 265, 264, MONO, MUTED);
+        label('ref_ct: 0', 265, 285, MONO, MUTED);
+        ctx.restore();
+
+        // tooltip box
+        rr(14, 290, 190, 46, 6, '#1a1d26', BORDER);
+        label('Python variable reassignment —', 109, 308, "11px 'Inter',sans-serif", TEXT);
+        label('pointer switches to new PyObject', 109, 323, "11px 'Inter',sans-serif", TEXT);
+
+        // ref_ct drops label (left)
+        label('ref_ct drops to 0 → freed', 160, 355, MONO, MUTED);
+
+        // ═══════════════════════════════════════════════════════
+        // TRANSITION ARROW in middle
+        // ═══════════════════════════════════════════════════════
+        label('x = "how…"', 350, 185, MONO, MUTED);
+        arrow(315, 192, 385, 192, MUTED);
+
+        // ═══════════════════════════════════════════════════════
+        // RIGHT SIDE — x = "how do you like them apples"
+        // ═══════════════════════════════════════════════════════
+        label('x = "how do you like them apples"', 560, 22, MONO, MUTED, 'center');
+
+        // globals() box (right)
+        rr(400, 34, 140, 64, 8, SURFACE, ACCENT);
+        label('globals()', 470, 54, "bold 13px 'Inter',sans-serif", '#e8eaf2');
+        divider(400, 62, 140);
+        label('"x" → 0x108b1', 470, 80, MONO, MUTED);
+
+        // PyObject int (dimmed, ref_ct: 0)
+        ctx.save(); ctx.globalAlpha = 0.35;
+        rr(565, 34, 120, 98, 8, '#0d0f14', DIM);
+        label('PyObject', 625, 52, "bold 13px 'Inter',sans-serif", DIMTEXT);
+        divider(565, 60, 120);
+        label('int', 625, 78, MONO, DIMTEXT);
+        label('2781', 625, 98, MONO, DIMTEXT);
+        label('ref_ct: 0', 625, 118, MONO, DIMTEXT);
+        ctx.restore();
+
+        // PyObject str (active)
+        card(565, 170, 120, 'PyObject', ['str', '"how..."', 'ref_ct: 1'], false);
+
+        // arrow globals(right) → PyObject str
+        arrow(540, 90, 565, 210, ACCENT);
+
+        // ref_ct drops label (right)
+        label('ref_ct drops to 0 → freed', 560, 355, MONO, MUTED);
+
+        // ··· top right
+        label('···', 682, 22, "16px 'Inter',sans-serif", MUTED);
+      })();
+    </script>
+
+    <h2>How CPython manages threads</h2>
+
+    <p>Now let's address the devil in the room: threading. To illustrate what happens without the GIL, let's switch to
+      C,
+      where threads can truly run in parallel. You can paste any of the C examples below into <a
+        href="https://www.programiz.com/c-programming/online-compiler/"
+        target="_blank">programiz.com/c-programming/online-compiler</a> to run them.</p>
+
+    <p>Let's create a simple struct to mimic <code>PyLongObject</code> and run two threads that both increment a shared
+      reference count 100 000 times each:</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">c</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="inc">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="inc">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="inc">#include</span> <span class="str">&lt;pthread.h&gt;</span>
+
+<span class="inc">#define</span> ITERS <span class="num">100000</span>
+
+<span class="kw">typedef</span> <span class="kw">struct</span> {
+    <span class="ty">int</span> val;
+    <span class="ty">int</span> ref_counts;
+} int_obj;
+
+int_obj* <span class="fn">create_int_obj</span>(<span class="ty">int</span> val) {
+    int_obj* obj = (int_obj*)malloc(<span class="kw">sizeof</span>(int_obj));
+    obj->val = val;
+    obj->ref_counts = <span class="num">1</span>;
+    <span class="kw">return</span> obj;
+}
+
+<span class="ty">int</span> <span class="fn">inc_ref</span>(int_obj* obj) {
+    obj->ref_counts++;
+    <span class="kw">return</span> <span class="num">1</span>;
+}
+
+<span class="kw">void</span>* <span class="fn">thread_inc</span>(<span class="kw">void</span>* arg) {
+    int_obj* obj = (int_obj*)(arg);
+    <span class="kw">for</span> (<span class="ty">int</span> i = <span class="num">0</span>; i &lt; ITERS; i++) {
+        inc_ref(obj);
+    }
+    <span class="kw">return</span> NULL;
+}
+
+<span class="ty">int</span> <span class="fn">main</span>() {
+    pthread_t t1, t2;
+    int_obj* obj = create_int_obj(<span class="num">42</span>);
+    pthread_create(&amp;t1, NULL, thread_inc, obj);
+    pthread_create(&amp;t2, NULL, thread_inc, obj);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf(<span class="str">"Final ref_count = %d\n"</span>, obj->ref_counts);
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <p>Any guesses what the final ref-count will be? If you said 200001, run it a few times. You'll get a different
+      answer every time. This is a classic example of <strong>race condition</strong>. Two threads are reading and
+      writing the same
+      value without any coordination.</p>
+
+    <h3>Adding dec_ref: segfaults and memory corruption</h3>
+
+    <p>Now let's add a decrement thread that frees the object when <code>ref_count</code> hits zero, exactly what
+      Python's garbage collector does. Let's also add if-checks in the <code>inc_ref</code> and the <code>dec_ref</code>
+      functions to avoid accessing a deleted object.</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">c</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="inc">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="inc">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="inc">#include</span> <span class="str">&lt;pthread.h&gt;</span>
+
+<span class="inc">#define</span> ITERS <span class="num">100000</span>
+
+<span class="kw">typedef</span> <span class="kw">struct</span> {
+    <span class="ty">int</span> val;
+    <span class="ty">int</span> ref_counts;
+} int_obj;
+
+int_obj* <span class="fn">create_int_obj</span>(<span class="ty">int</span> val) {
+    int_obj* obj = (int_obj*)malloc(<span class="kw">sizeof</span>(int_obj));
+    obj->val = val;
+    obj->ref_counts = <span class="num">1</span>;
+    <span class="kw">return</span> obj;
+}
+
+<span class="ty">int</span> <span class="fn">inc_ref</span>(int_obj* obj) {
+    <span class="kw">if</span> (obj->ref_counts &lt;= <span class="num">0</span>) {
+        printf(<span class="str">"Cannot increase ref_count of a deleted object\n"</span>);
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    obj->ref_counts++;
+    <span class="kw">return</span> <span class="num">1</span>;
+}
+
+<span class="ty">int</span> <span class="fn">dec_ref</span>(int_obj* obj) {
+    <span class="kw">if</span> (obj->ref_counts &lt;= <span class="num">0</span>) {
+        printf(<span class="str">"Cannot decrease ref_count of a deleted object\n"</span>);
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    obj->ref_counts--;
+    <span class="kw">if</span> (obj->ref_counts == <span class="num">0</span>) {
+        free(obj);
+        printf(<span class="str">"Deleted object\n"</span>);
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    <span class="kw">return</span> <span class="num">1</span>;
+}
+
+<span class="kw">void</span>* <span class="fn">thread_inc</span>(<span class="kw">void</span>* arg) {
+    int_obj* obj = (int_obj*)(arg);
+    <span class="ty">int</span> err;
+    <span class="kw">for</span> (<span class="ty">int</span> i = <span class="num">0</span>; i &lt; ITERS; i++) {
+        err = inc_ref(obj);
+        <span class="kw">if</span> (err == <span class="num">0</span>) <span class="kw">break</span>;
+    }
+    <span class="kw">return</span> NULL;
+}
+
+<span class="kw">void</span>* <span class="fn">thread_dec</span>(<span class="kw">void</span>* arg) {
+    int_obj* obj = (int_obj*)(arg);
+    <span class="ty">int</span> err;
+    <span class="kw">for</span> (<span class="ty">int</span> i = <span class="num">0</span>; i &lt; ITERS; i++) {
+        err = dec_ref(obj);
+        <span class="kw">if</span> (err == <span class="num">0</span>) <span class="kw">break</span>;
+    }
+    <span class="kw">return</span> NULL;
+}
+
+<span class="ty">int</span> <span class="fn">main</span>() {
+    pthread_t t1, t2;
+    int_obj* obj = create_int_obj(<span class="num">42</span>);
+    pthread_create(&amp;t1, NULL, thread_inc, obj);
+    pthread_create(&amp;t2, NULL, thread_dec, obj);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf(<span class="str">"Final ref_count = %d\n"</span>, obj->ref_counts);
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <p>
+      Run it a few times. The results are completely unreliable. Since the threads are not synchronized, they can
+      interfere
+      with each other's operations. This can lead to the increment_thread increasing the reference count of an object
+      that has
+      already been freed, or the decrement_thread freeing the same object multiple times.
+    </p>
+
+    <div class="output-block error">Deleted object
+      Segmentation fault
+      === Code Exited With Errors ===
+
+      Deleted object
+      Cannot increase ref_count of a deleted object
+      Segmentation fault
+      === Code Exited With Errors ===
+
+      Final ref_count = 16317
+      === Code Execution Successful ===</div>
+
+    <h3>The fix: a global mutex lock</h3>
+
+    <p>The fix? We add a lock. Each thread must acquire it before operating on the shared object, and release it
+      after. This ensures they function cooperatively:</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">c</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="inc">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="inc">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="inc">#include</span> <span class="str">&lt;pthread.h&gt;</span>
+
+<span class="inc">#define</span> ITERS <span class="num">100000</span>
+
+pthread_mutex_t LOCK;
+
+<span class="kw">typedef</span> <span class="kw">struct</span> {
+    <span class="ty">int</span> val;
+    <span class="ty">int</span> ref_counts;
+} int_obj;
+
+int_obj* <span class="fn">create_int_obj</span>(<span class="ty">int</span> val) {
+    int_obj* obj = (int_obj*)malloc(<span class="kw">sizeof</span>(int_obj));
+    obj->val = val;
+    obj->ref_counts = <span class="num">1</span>;
+    <span class="kw">return</span> obj;
+}
+
+<span class="ty">int</span> <span class="fn">inc_ref</span>(int_obj* obj) {
+    <span class="kw">if</span> (obj->ref_counts &lt;= <span class="num">0</span>) {
+        printf(<span class="str">"Cannot increase ref_count of a deleted object\n"</span>);
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    obj->ref_counts++;
+    <span class="kw">return</span> <span class="num">1</span>;
+}
+
+<span class="ty">int</span> <span class="fn">dec_ref</span>(int_obj* obj) {
+    <span class="kw">if</span> (obj->ref_counts &lt;= <span class="num">0</span>) {
+        printf(<span class="str">"Cannot decrease ref_count of a deleted object\n"</span>);
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    obj->ref_counts--;
+    <span class="kw">if</span> (obj->ref_counts == <span class="num">0</span>) {
+        free(obj);
+        <span class="kw">return</span> <span class="num">0</span>;
+    }
+    <span class="kw">return</span> <span class="num">1</span>;
+}
+
+<span class="kw">void</span>* <span class="fn">thread_inc</span>(<span class="kw">void</span>* arg) {
+    int_obj* obj = (int_obj*)(arg);
+    <span class="ty">int</span> err;
+    <span class="kw">for</span> (<span class="ty">int</span> i = <span class="num">0</span>; i &lt; ITERS; i++) {
+        pthread_mutex_lock(&amp;LOCK);
+        err = inc_ref(obj);
+        pthread_mutex_unlock(&amp;LOCK);
+        <span class="kw">if</span> (err == <span class="num">0</span>) <span class="kw">break</span>;
+    }
+    <span class="kw">return</span> NULL;
+}
+
+<span class="kw">void</span>* <span class="fn">thread_dec</span>(<span class="kw">void</span>* arg) {
+    int_obj* obj = (int_obj*)(arg);
+    <span class="ty">int</span> err;
+    <span class="kw">for</span> (<span class="ty">int</span> i = <span class="num">0</span>; i &lt; ITERS; i++) {
+        pthread_mutex_lock(&amp;LOCK);
+        err = dec_ref(obj);
+        pthread_mutex_unlock(&amp;LOCK);
+        <span class="kw">if</span> (err == <span class="num">0</span>) <span class="kw">break</span>;
+    }
+    <span class="kw">return</span> NULL;
+}
+
+<span class="ty">int</span> <span class="fn">main</span>() {
+    pthread_t t1, t2;
+
+    int_obj* obj = create_int_obj(<span class="num">42</span>);
+    pthread_create(&amp;t1, NULL, thread_inc, obj);
+    pthread_create(&amp;t2, NULL, thread_inc, obj);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    printf(<span class="str">"Final ref_count = %d\n"</span>, obj->ref_counts);
+
+    pthread_t t3, t4;
+    obj = create_int_obj(<span class="num">42</span>);
+    pthread_create(&amp;t3, NULL, thread_inc, obj);
+    pthread_create(&amp;t4, NULL, thread_dec, obj);
+    pthread_join(t3, NULL);
+    pthread_join(t4, NULL);
+    printf(<span class="str">"Final ref_count = %d\n"</span>, obj->ref_counts);
+
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <p>With both threads incrementing, we reliably get <code>200001</code> every run. With one increment and one
+      decrement thread, two outcomes are possible:</p>
+
+    <p><strong>1.</strong> If the ref-count never reaches 0, the final count is 1 (100 000 increments minus 100 000
+      decrements, starting from 1):</p>
+
+    <div class="output-block">Final ref_count = 200001
+      Final ref_count = 1
+
+      === Code Execution Successful ===</div>
+
+    <p><strong>2.</strong> If the ref-count reaches 0 and the object is freed, the increment thread reliably receives
+      the update and terminates safely — no segmentation fault:</p>
+
+    <div class="output-block">Final ref_count = 200001
+      Cannot increase ref_count of a deleted object
+      Final ref_count = 0</div>
+
+    <h3>Per-object locks vs. one global lock</h3>
+
+    <p>We can also add a lock to each object instead of using one global lock. This will allow two threads working on
+      <em>different</em> objects to run truly in parallel:
+    </p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">c</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="kw">typedef</span> <span class="kw">struct</span> {
+    <span class="ty">int</span> val;
+    <span class="ty">int</span> ref_counts;
+    pthread_mutex_t lock; <span class="cmt">// per-object lock</span>
+} int_obj;</code></pre>
+    </div>
+
+    <p>However, locks are expensive. Acquiring and releasing a mutex for every reference count mutation on every object
+      adds serious overhead. One <strong>global</strong> lock is simpler
+      and cheaper per operation, at the cost of true CPU parallelism.</p>
+
+    <p>CPython doesn't let a thread hold the GIL for its entire lifetime. It uses a <strong>time-slice model</strong>: a
+      thread acquires the GIL, runs for a fixed interval, then releases it so other threads get a turn. The interval is
+      controlled by <code>sys.setswitchinterval()</code> and defaults to 5 ms on Python 3.13+:</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="py-kw">import</span> sys
+<span class="py-builtin">print</span>(sys.getswitchinterval())  <span class="py-cmt"># 0.005  (5 ms)</span></code></pre>
+    </div>
+
+    <div class="output-block">0.005</div>
+
+    <h2>Threading for concurrent I/O</h2>
+
+    <p>During I/O operations like network requests, Python releases the GIL. The below script runs in ~2 seconds with
+      threads versus ~6 seconds sequentially:</p>
+
+    <div class="code-block">
+      <div class="code-header"><span class="lang-badge">python</span><button class="copy-btn"
+          onclick="copyCode(this)">copy</button></div>
+      <pre><code><span class="py-kw">import</span> threading
+<span class="py-kw">import</span> time
+<span class="py-kw">import</span> urllib.request
+
+<span class="py-kw">def</span> <span class="py-fn">fetch</span>(url):
+    <span class="py-builtin">print</span>(<span class="py-str">f"[{threading.current_thread().name}] starting request"</span>)
+    urllib.request.urlopen(url)
+    <span class="py-builtin">print</span>(<span class="py-str">f"[{threading.current_thread().name}] done"</span>)
+
+urls = [
+    <span class="py-str">"https://httpbin.org/delay/2"</span>,
+    <span class="py-str">"https://httpbin.org/delay/2"</span>,
+    <span class="py-str">"https://httpbin.org/delay/2"</span>,
+]
+
+<span class="py-cmt"># Sequential — takes ~6 seconds</span>
+start = time.time()
+<span class="py-kw">for</span> url <span class="py-kw">in</span> urls:
+    fetch(url)
+<span class="py-builtin">print</span>(<span class="py-str">f"Sequential: {time.time() - start:.1f}s"</span>)
+
+<span class="py-cmt"># Threaded — takes ~2 seconds despite the GIL</span>
+start = time.time()
+threads = [threading.Thread(target=fetch, args=(url,)) <span class="py-kw">for</span> url <span class="py-kw">in</span> urls]
+<span class="py-kw">for</span> t <span class="py-kw">in</span> threads: t.start()
+<span class="py-kw">for</span> t <span class="py-kw">in</span> threads: t.join()
+<span class="py-builtin">print</span>(<span class="py-str">f"Threaded: {time.time() - start:.1f}s"</span>)</code></pre>
+    </div>
+
+    <div class="output-block">[Thread-1] starting request
+      [Thread-2] starting request
+      [Thread-3] starting request
+      [Thread-1] done
+      [Thread-2] done
+      [Thread-3] done
+      Sequential: 6.0s
+      Threaded: 2.0s</div>
+
+    <div class="callout">
+      <strong>Tip:</strong> If you want to make concurrent network requests in Python,
+      <strong>coroutines</strong> (via <code>asyncio</code>) are the better option. But that's a topic for the <a href="asyncio-blog.html">next post</a>.
+    </div>
+
+    <h2>Conclusion</h2>
+
+    <p>While the GIL limits CPU-bound multithreading, it simplifies development by ensuring thread-safe memory
+      management and object reference counting. It also makes life easier for developers maintaining C extensions. They
+      can write code without worrying about thread safety at the object level.</p>
+
+    <p>Recent updates (Python 3.13+) have introduced an experimental <strong>no-GIL mode</strong> to remove the lock
+      entirely, but widespread adoption is slow. Without the GIL, the entire burden of thread safety shifts onto every C
+      extension.</p>
+
+    <p>In practice, the GIL isn't a bottleneck for most tasks. Python is great at orchestrating different performant
+      libraries.
+      It's generally
+      not used for running heavy computational workloads that benefit from multiple cores. Instead, it relies
+      libraries like
+      NumPy, Pytorch, OpenCV, etc. These libraries, written mostly in C/C++, drop the GIL anyways and use multiple cores
+      to
+      parallelize operations like matrix multiplications.</p>
+
+    <footer>
+      <p>Paste C examples into <a href="https://www.programiz.com/c-programming/online-compiler/"
+          target="_blank">programiz.com/c-programming/online-compiler</a> to run them live.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    function copyCode(btn) {
+      const pre = btn.closest('.code-block').querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(() => {
+        btn.textContent = 'copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500);
+      });
+    }
+  </script>
+</body>
+
+</html>

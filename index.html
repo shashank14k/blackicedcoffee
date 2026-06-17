@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Name</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,wght@0,300;0,600;1,300&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0f14;
+            --surface: #13161d;
+            --border: #1e2330;
+            --text: #c9cdd8;
+            --muted: #606578;
+            --accent: #5c9fff;
+            --font-display: 'Fraunces', Georgia, serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.75;
+            padding: 0 1.5rem;
+            min-height: 100vh;
+        }
+
+        .wrapper {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 5rem 0 6rem;
+        }
+
+        /* ── Bio ── */
+        .bio {
+            margin-bottom: 4rem;
+        }
+
+        .name {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 2.8rem);
+            font-weight: 600;
+            color: #e8eaf2;
+            margin-bottom: 0.4rem;
+        }
+
+        .tagline {
+            font-family: var(--font-code);
+            font-size: 0.82rem;
+            color: var(--accent);
+            letter-spacing: 0.06em;
+            margin-bottom: 1.2rem;
+        }
+
+        .bio p {
+            color: var(--muted);
+            font-size: 0.97rem;
+            max-width: 520px;
+        }
+
+        .links {
+            display: flex;
+            gap: 1.2rem;
+            margin-top: 1.2rem;
+            flex-wrap: wrap;
+        }
+
+        .links a {
+            font-family: var(--font-code);
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-decoration: none;
+            letter-spacing: 0.05em;
+            transition: color 0.15s;
+        }
+
+        .links a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Writing section ── */
+        .section-label {
+            font-family: var(--font-code);
+            font-size: 0.7rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 1.2rem;
+        }
+
+        .post-list {
+            list-style: none;
+        }
+
+        .post-item {
+            border-top: 1px solid var(--border);
+            padding: 1.2rem 0;
+        }
+
+        .post-item:last-child {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .post-link {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 1rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .post-title {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #e0e3ee;
+            transition: color 0.15s;
+        }
+
+        .post-link:hover .post-title {
+            color: var(--accent);
+        }
+
+        .post-date {
+            font-family: var(--font-code);
+            font-size: 0.72rem;
+            color: var(--muted);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .post-desc {
+            margin-top: 0.3rem;
+            font-size: 0.88rem;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+
+        <div class="bio">
+            <h1 class="name">Shashank</h1>
+            <p class="tagline">// curious dev</p>
+        </div>
+
+        <p class="section-label">writing</p>
+        <ul class="post-list">
+
+            <li class="post-item">
+                <a class="post-link" href="./python-internals/gil-blog.html">
+                    <span class="post-title">The GIL isn't so bad after all</span>
+                    <span class="post-date">Jun 2026</span>
+                </a>
+                <p class="post-desc">Why CPython's Global Interpreter Lock exists, what problem it solves, and why
+                    removing it is harder than it sounds.</p>
+            </li>
+
+            <li class="post-item">
+                <a class="post-link" href="./python-internals/asyncio-blog.html">
+                    <span class="post-title">Understanding asynchronous Python with Generators</span>
+                    <span class="post-date">Jun 2026</span>
+                </a>
+                <p class="post-desc">Building an async runtime from scratch using generators to understand how asyncio really works under the hood.</p>
+            </li>
+
+            <li class="post-item">
+                <a class="post-link" href="./python-internals/async-http-blog.html">
+                    <span class="post-title">Unraveling an Async HTTP Request</span>
+                    <span class="post-date">Jun 2026</span>
+                </a>
+                <p class="post-desc">Tracing the full lifecycle of an async HTTP request from coroutine to socket and back.</p>
+            </li>
+
+            <!-- add future posts here -->
+
+        </ul>
+
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding <code style="font-size:inherit;background:none;color:#82cfff;">asynchronous</code> Python
+        with Generators</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,wght@0,300;0,600;1,300&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0f14;
+            --surface: #13161d;
+            --border: #1e2330;
+            --text: #c9cdd8;
+            --muted: #606578;
+            --accent: #5c9fff;
+            --accent-dim: rgba(92, 159, 255, 0.12);
+            --green: #4ecb71;
+            --red: #f07070;
+            --yellow: #e8c96d;
+            --font-display: 'Fraunces', Georgia, serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+            --font-code: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.75;
+            padding: 0 1rem;
+        }
+
+        .wrapper {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 4rem 0 6rem;
+        }
+
+        .hero {
+            margin-bottom: 3.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2.5rem;
+        }
+
+        .hero-eyebrow {
+            font-family: var(--font-code);
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 600;
+            line-height: 1.15;
+            color: #e8eaf2;
+            margin-bottom: 1.25rem;
+        }
+
+        .hero-sub {
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-family: var(--font-code);
+        }
+
+        p {
+            margin-bottom: 1.3rem;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 1.55rem;
+            font-weight: 600;
+            color: #e0e3ee;
+            margin: 2.8rem 0 0.9rem;
+            padding-top: 0.5rem;
+        }
+
+        h3 {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 300;
+            font-style: italic;
+            color: var(--accent);
+            margin: 2rem 0 0.6rem;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        li {
+            margin-left: 1.4rem;
+            margin-bottom: 0.3rem;
+        }
+
+        ul {
+            margin-bottom: 1.2rem;
+        }
+
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow: hidden;
+            font-family: var(--font-code);
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background: var(--border);
+            font-size: 0.72rem;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .code-header .lang-badge {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--muted);
+            color: var(--muted);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: var(--font-code);
+            font-size: 0.68rem;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .copy-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .copy-btn.copied {
+            color: var(--green);
+            border-color: var(--green);
+        }
+
+        pre {
+            padding: 1.2rem 1.4rem;
+            overflow-x: auto;
+            font-size: 0.82rem;
+            line-height: 1.65;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .kw {
+            color: #c792ea;
+        }
+
+        .ty {
+            color: #82aaff;
+        }
+
+        .fn {
+            color: #82cfff;
+        }
+
+        .str {
+            color: #c3e88d;
+        }
+
+        .num {
+            color: var(--yellow);
+        }
+
+        .cmt {
+            color: #546e7a;
+            font-style: italic;
+        }
+
+        code {
+            font-family: var(--font-code);
+            font-size: 0.82em;
+            background: var(--accent-dim);
+            color: #a8d4ff;
+            padding: 0.15em 0.45em;
+            border-radius: 4px;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+
+        .output-block {
+            background: #0a0c10;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--green);
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0 1.5rem;
+            padding: 1rem 1.2rem;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+            line-height: 1.7;
+            color: #9fb8a0;
+            overflow-x: auto;
+            white-space: pre-line;
+        }
+
+        .output-block .ok {
+            color: var(--green);
+        }
+
+        .output-block .err {
+            color: var(--red);
+        }
+
+        .output-block .dim {
+            color: var(--muted);
+        }
+
+        .callout {
+            background: var(--accent-dim);
+            border: 1px solid rgba(92, 159, 255, 0.25);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.2rem;
+            margin: 1.5rem 0;
+            font-size: 0.92rem;
+            color: #b0c8ee;
+        }
+
+        .callout strong {
+            color: var(--accent);
+        }
+
+        footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-family: var(--font-code);
+        }
+
+        footer a {
+            color: var(--muted);
+        }
+
+        .chart-figure {
+            margin: 1.5rem 0 2rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .chart-figure img {
+            width: 100%;
+            display: block;
+        }
+
+        .chart-caption {
+            padding: 0.6rem 1rem;
+            font-family: var(--font-code);
+            font-size: 0.72rem;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            text-align: center;
+            letter-spacing: 0.04em;
+        }
+
+
+        @media (max-width: 500px) {
+            body {
+                font-size: 15px;
+            }
+
+            .wrapper {
+                padding: 2rem 0 4rem;
+            }
+
+            pre {
+                font-size: 0.73rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+
+        <header class="hero">
+            <div class="hero-eyebrow">Deep Dive · Python Internals · Part 2</div>
+            <h1>Understanding <code style="font-size:inherit;background:none;color:#82cfff;">asynchronous</code> Python
+                with Generators</h1>
+            <p class="hero-sub">// How coroutines work under the hood — built from first principles</p>
+        </header>
+
+        <p>
+            In the <a href="gil-blog.html">previous post</a>, we explored why CPython uses the GIL and how threads
+            are limited for IO-bound workloads. In this post, let's understand how <code>async</code> works under
+            the hood by building a coroutine scheduler from scratch using generators.
+        </p>
+
+        <p>
+            Consider an extremely useless program that waits for some remote database operation and then returns a
+            random integer. The write operation takes a second, while the number generation is almost instant.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> time
+<span class="kw">import</span> random
+
+<span class="kw">def</span> <span class="fn">generate_random</span>():
+    time.sleep(<span class="num">1</span>)  <span class="cmt"># Mock db call</span>
+    <span class="kw">return</span> random.randint(<span class="num">0</span>, <span class="num">100</span>)</code></pre>
+        </div>
+
+        <p>
+            The program works fine if we want to generate a few integers (1–5). But what if we want to generate 100,
+            1000, or 10000 integers? How do we avoid waiting 10k seconds to generate 10k numbers?
+        </p>
+
+        <p>
+            The program, albeit useless, mimics a simple microservice API which, when hit, makes some database calls,
+            hits another API, fetches the response, and returns the result to the user. You might have built such APIs
+            yourself using FastAPI, and I am sure that while doing so you used an <code>async def</code> function
+            instead of a plain <code>def</code> function. But do you truly know what <code>async</code> is doing under
+            the hood?
+        </p>
+
+        <p>
+            Let's begin by converting this to an async program and confirming that it really works.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> random
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+<span class="kw">import</span> time
+<span class="kw">import</span> asyncio
+
+<span class="kw">async def</span> <span class="fn">generate_random</span>():
+    <span class="kw">await</span> asyncio.sleep(<span class="num">1</span>)  <span class="cmt"># mock db call</span>
+    <span class="kw">return</span> random.randint(<span class="num">0</span>, <span class="num">100</span>)
+
+<span class="kw">async def</span> <span class="fn">benchmark</span>():
+    res = []
+    test_points = [<span class="num">1</span>, <span class="num">10</span>, <span class="num">50</span>, <span class="num">100</span>, <span class="num">500</span>, <span class="num">1000</span>, <span class="num">5000</span>, <span class="num">10000</span>, <span class="num">20000</span>]
+
+    <span class="kw">for</span> r <span class="kw">in</span> test_points:
+        tasks = [generate_random() <span class="kw">for</span> _ <span class="kw">in</span> range(r)]
+
+        start = time.perf_counter()
+        <span class="kw">await</span> asyncio.gather(*tasks)
+        end = time.perf_counter()
+
+        elapsed = end - start
+        print(<span class="str">f"requests=<span class="kw">{</span>r<span class="kw">}</span>, time=<span class="kw">{</span>elapsed:.4f<span class="kw">}</span>s"</span>)
+        res.append((r, elapsed))
+
+    <span class="kw">return</span> res
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    res = <span class="kw">await</span> benchmark()
+    x = [r <span class="kw">for</span> r, _ <span class="kw">in</span> res]
+    y = [t <span class="kw">for</span> _, t <span class="kw">in</span> res]
+
+    plt.plot(x, y, marker=<span class="str">"o"</span>)
+    plt.xlabel(<span class="str">"Number of requests"</span>)
+    plt.ylabel(<span class="str">"Time taken (seconds)"</span>)
+    plt.title(<span class="str">"Async Gather Scaling"</span>)
+    plt.grid(<span class="kw">True</span>)
+    plt.savefig(<span class="str">"async.png"</span>)
+    plt.show()
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    asyncio.run(main())</code></pre>
+        </div>
+
+        <p>It generates all 20 000 integers in under 1.1 seconds.</p>
+
+        <figure class="chart-figure">
+            <img src="assets/async.png"
+                alt="Async gather scaling — time stays flat near 1 second across 1 to 20 000 requests">
+            <figcaption class="chart-caption">asyncio.gather · 1 → 20 000 requests · time ≈ 1.0 – 1.08 s</figcaption>
+        </figure>
+
+
+        <p>
+            Let's also run the same benchmark with multiprocessing and multithreading. You'll notice that they quickly
+            hit a ceiling.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · multiprocessing</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> random, time, matplotlib.pyplot <span class="kw">as</span> plt, multiprocessing
+
+<span class="kw">def</span> <span class="fn">fetch_data</span>():
+    time.sleep(<span class="num">1</span>)
+    <span class="kw">return</span> random.randint(<span class="num">0</span>, <span class="num">5</span>)
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    res = []
+    test_points = [<span class="num">1</span>, <span class="num">10</span>, <span class="num">20</span>, <span class="num">50</span>, <span class="num">100</span>, <span class="num">200</span>]
+    <span class="kw">for</span> r <span class="kw">in</span> test_points:
+        processes = [multiprocessing.Process(target=fetch_data) <span class="kw">for</span> _ <span class="kw">in</span> range(r)]
+        start = time.time()
+        <span class="kw">for</span> p <span class="kw">in</span> processes: p.start()
+        <span class="kw">for</span> p <span class="kw">in</span> processes: p.join()
+        end = time.time()
+        print(<span class="str">"time taken"</span>, end - start)
+        res.append((r, end - start))
+
+    plt.plot([r <span class="kw">for</span> r, t <span class="kw">in</span> res], [t <span class="kw">for</span> r, t <span class="kw">in</span> res], marker=<span class="str">'o'</span>)
+    plt.xlabel(<span class="str">"Number of requests (r)"</span>); plt.ylabel(<span class="str">"Time taken (seconds)"</span>)
+    plt.title(<span class="str">"Time vs Number of Requests"</span>); plt.grid(<span class="kw">True</span>)
+    plt.savefig(<span class="str">"mp.png"</span>); plt.show()</code></pre>
+        </div>
+
+        <figure class="chart-figure">
+            <img src="assets/mp.png"
+                alt="Multiprocessing benchmark — time grows linearly and quickly, reaching ~7 s at 200 requests">
+            <figcaption class="chart-caption">multiprocessing · 1 → 200 requests · time grows to ~7.3 s</figcaption>
+        </figure>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · threading</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> random, time, threading, matplotlib.pyplot <span class="kw">as</span> plt
+
+<span class="kw">def</span> <span class="fn">fetch_data</span>():
+    time.sleep(<span class="num">1</span>)
+    <span class="kw">return</span> random.randint(<span class="num">0</span>, <span class="num">5</span>)
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    res = []
+    test_points = [<span class="num">1</span>, <span class="num">10</span>, <span class="num">20</span>, <span class="num">50</span>, <span class="num">100</span>, <span class="num">200</span>, <span class="num">400</span>, <span class="num">1000</span>, <span class="num">1500</span>, <span class="num">2000</span>, <span class="num">2500</span>, <span class="num">3000</span>, <span class="num">4000</span>]
+    <span class="kw">for</span> r <span class="kw">in</span> test_points:
+        threads = [threading.Thread(target=fetch_data) <span class="kw">for</span> _ <span class="kw">in</span> range(r)]
+        start = time.time()
+        <span class="kw">for</span> t <span class="kw">in</span> threads: t.start()
+        <span class="kw">for</span> t <span class="kw">in</span> threads: t.join()
+        end = time.time()
+        print(<span class="str">"time taken"</span>, end - start)
+        res.append((r, end - start))
+
+    plt.plot([r <span class="kw">for</span> r, t <span class="kw">in</span> res], [t <span class="kw">for</span> r, t <span class="kw">in</span> res], marker=<span class="str">'o'</span>)
+    plt.xlabel(<span class="str">"Number of requests (r)"</span>); plt.ylabel(<span class="str">"Time taken (seconds)"</span>)
+    plt.title(<span class="str">"Time vs Number of Requests"</span>); plt.grid(<span class="kw">True</span>)
+    plt.savefig(<span class="str">"threads.png"</span>); plt.show()</code></pre>
+        </div>
+
+        <figure class="chart-figure">
+            <img src="assets/threads.png"
+                alt="Threading benchmark — time grows to ~9.7 s at 4 000 requests with an inflection point around 1 000">
+            <figcaption class="chart-caption">threading · 1 → 4 000 requests · time grows to ~9.7 s</figcaption>
+        </figure>
+
+        <h2>Why doesn't multiprocessing work here?</h2>
+
+        <p>
+            First, just because you launch <em>n</em> processes does not mean they run in parallel. Parallelism is
+            constrained by the hardware. If your machine has <em>m</em> cores, it can only run <em>m</em> programs in
+            parallel — the rest wait their turn. When <em>n</em> > <em>m</em>, the OS juggles the processes by giving
+            each process a small time-slice on the available cores and then switching between them. This process is
+            called <em>context switch</em>. Every context switch involves saving the state of the current process and
+            loading the state of the next to resume it, and hence has an overhead.
+        </p>
+        <p>
+            In our program, the CPU schedules the db request, and then spends most of its time sleeping, waiting for a
+            remote database
+            response. It is hence, <em>IO-bound</em>, not <em>Compute-bound</em>. It hardly needs any compute. Creating
+            hundreds of such processes just wastes memory and adds unnecessary context-switch
+            overhead. Hence, multiprocessing is not ideal to scale <em>IO-bound</em> programs.
+        </p>
+
+        <h2>Why doesn't multithreading work here?</h2>
+
+        <p>
+            Like processes, threads in Python's native <code>threading</code> library are also managed by the OS. The
+            key difference is that threads are lighter
+            — because they share the heap, the overhead of scheduling them is cheaper. Hence, threads scale better
+            than processes in this example, but they still hit a wall.
+        </p>
+
+        <h2>Building a mock coroutine with Generator</h2>
+
+        <p>
+            We now know that IO-bound programs do not work well with multiprocessing or multithreading. But, we also
+            know that during IO, the CPU is idle. Can us, programmers, use this as an advantage in the application?
+            Can we make our program proceed with the next task while waiting for the current one?
+        </p>
+
+        <p>
+            Let's assume the database call always takes 1 second. We know that if the function is called at time
+            <em>t</em>, it will not be ready to continue until <em>t + 1</em>. During this window the CPU is idle.
+            If we build a mechanism to <em>pause</em> our function at <em>t</em> and <em>resume</em> it at
+            <em>t + 1</em>, we can give the CPU other work in between. Normal functions are not state-aware — you
+            cannot run them to a certain point, pause them, and then resume. However, <strong>generators</strong>
+            provide this flexibility.
+        </p>
+
+        <p>Consider the following generator function. Notice that it uses <code>yield</code> instead of
+            <code>return</code>.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">def</span> <span class="fn">get_number</span>():
+    i = <span class="num">0</span>
+    <span class="kw">yield</span> i
+    i += <span class="num">1</span>
+    <span class="kw">yield</span> i
+    i += <span class="num">1</span>
+    <span class="kw">yield</span> i</code></pre>
+        </div>
+
+        <p>
+            If you call it like a normal function, you only get a generator object back. Every generator object in
+            Python has the <code>__next__</code> method. When called, <code>__next__</code> runs the function up to
+            the next <code>yield</code> and then suspends it. So the first call in the snippet below prints
+            <code>0</code>.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    gen = get_number()
+    print(gen)
+    print(gen.__next__())  <span class="cmt"># or: print(next(gen))</span></code></pre>
+        </div>
+
+        <div class="output-block">&lt;generator object get_number at 0x1013c9a80&gt;
+            0</div>
+
+        <p>On the subsequent call, the program prints <code>1</code>:</p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code>    print(gen.__next__())
+    print(gen.__next__())</code></pre>
+        </div>
+
+        <div class="output-block">0
+            1</div>
+
+        <div class="callout">
+            <strong>Note:</strong> Do not call <code>__next__</code> on a generator that has already been exhausted —
+            it raises <code>StopIteration</code>.
+        </div>
+
+        <p>
+            So we have a simple function that we can pause and resume. We can use this to create an infinite number
+            generator, and it even works inside a <code>for</code> loop:
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">def</span> <span class="fn">get_numbers</span>():
+    i = -<span class="num">1</span>
+    <span class="kw">while True</span>:
+        i += <span class="num">1</span>
+        <span class="kw">yield</span> i
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    gen = get_numbers()
+    print(gen.__next__())
+
+    <span class="kw">for</span> num <span class="kw">in</span> gen:
+        print(num)
+        <span class="kw">if</span> num == <span class="num">10</span>:
+            <span class="kw">break</span></code></pre>
+        </div>
+
+        <div class="output-block">0
+            1
+            2
+            3
+            4
+            5
+            6
+            7
+            8
+            9
+            10</div>
+
+        <p>
+            We can now use <code>yield</code> in our program to suspend the function. Let's yield the tuple
+            <code>("sleeping", 1)</code> to signal to the caller: "please resume me after 1 second."
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> time
+<span class="kw">import</span> random
+
+<span class="kw">def</span> <span class="fn">generate_random</span>():
+    <span class="kw">yield</span> <span class="str">"sleeping"</span>, <span class="num">1</span>
+    <span class="kw">return</span> <span class="str">"running"</span>, random.randint(<span class="num">0</span>, <span class="num">100</span>)</code></pre>
+        </div>
+
+        <p>
+            We can now write a scheduler that, for <em>n</em> random-number
+            requests, fires up <em>n</em> instances of the <code>generate_random</code> generator. All generators kick
+            off their IO work simultaneously. After 1 second passes, we invoke them again to collect the results.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · simple scheduler</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> time
+<span class="kw">import</span> random
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+
+<span class="kw">def</span> <span class="fn">generate_random</span>():
+    <span class="kw">yield</span> <span class="str">"sleeping"</span>, <span class="num">1</span>
+    <span class="kw">yield</span> <span class="str">"running"</span>, random.randint(<span class="num">0</span>, <span class="num">100</span>)
+
+<span class="kw">def</span> <span class="fn">schedule</span>(n):
+    generators = [generate_random() <span class="kw">for</span> _ <span class="kw">in</span> range(n)]
+    values = []
+
+    <span class="kw">for</span> g <span class="kw">in</span> generators:
+        state, val = next(g)
+
+    time.sleep(<span class="num">1</span>)
+
+    <span class="kw">for</span> g <span class="kw">in</span> generators:
+        state, val = next(g)
+        values.append(val)
+
+    print(<span class="str">f"generated <span class="kw">{</span>len(values)<span class="kw">}</span> values"</span>)
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    res = []
+    test_points = [<span class="num">1</span>, <span class="num">10</span>, <span class="num">50</span>, <span class="num">100</span>, <span class="num">500</span>, <span class="num">1000</span>, <span class="num">2000</span>, <span class="num">5000</span>, <span class="num">10000</span>, <span class="num">20000</span>, <span class="num">50000</span>, <span class="num">100000</span>]
+    <span class="kw">for</span> r <span class="kw">in</span> test_points:
+        start = time.time()
+        schedule(r)
+        end = time.time()
+        print(<span class="str">"time taken"</span>, end - start)
+        res.append((r, end - start))
+
+    plt.plot([r <span class="kw">for</span> r, t <span class="kw">in</span> res], [t <span class="kw">for</span> r, t <span class="kw">in</span> res], marker=<span class="str">'o'</span>)
+    plt.xlabel(<span class="str">"Number of requests (r)"</span>)
+    plt.ylabel(<span class="str">"Time taken (seconds)"</span>)
+    plt.title(<span class="str">"Time vs Number of Requests"</span>)
+    plt.grid(<span class="kw">True</span>)
+    plt.savefig(<span class="str">"asynch.png"</span>)
+    plt.show()</code></pre>
+        </div>
+
+        <figure class="chart-figure">
+            <img src="assets/async-mock.png"
+                alt="Generator-based async mock — time stays flat near 1 second regardless of request count">
+            <figcaption class="chart-caption">generator async mock · scaling benchmark</figcaption>
+        </figure>
+
+        <p>
+            Like the <code>asyncio</code> example, this works well even for 10k integers. The maximum wait time is
+            always close to 1 second regardless of how many generators are in flight.
+        </p>
+
+        <h2>Handling variable wait times</h2>
+
+        <p>
+            Let's make this more realistic. Suppose the wait is now random, anywhere between 1 and 3 seconds:
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">def</span> <span class="fn">generate_random</span>():
+    <span class="kw">yield</span> <span class="str">"sleeping"</span>, random.randint(<span class="num">1</span>, <span class="num">3</span>)
+    <span class="kw">yield</span> <span class="str">"running"</span>, random.randint(<span class="num">0</span>, <span class="num">100</span>)</code></pre>
+        </div>
+
+        <p>
+            Now our scheduler cannot simply fire all generators, sleep for one second, and fire them again. It needs
+            to track when each generator is next ready to run. We solve this with a min-heap sorted by wake-up time:
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · heap scheduler</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> time
+<span class="kw">import</span> random
+<span class="kw">import</span> heapq
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+
+<span class="kw">def</span> <span class="fn">generate_random</span>():
+    <span class="kw">yield</span> <span class="str">"sleeping"</span>, random.randint(<span class="num">1</span>, <span class="num">3</span>)
+    <span class="kw">yield</span> <span class="str">"running"</span>, random.randint(<span class="num">0</span>, <span class="num">100</span>)
+
+<span class="kw">def</span> <span class="fn">schedule</span>(n):
+    generators = [(0, i, generate_random()) <span class="kw">for</span> i <span class="kw">in</span> range(n)]
+    heapq.heapify(generators)
+    sleep_time = float(<span class="str">"inf"</span>)
+    values = []
+
+    <span class="kw">while</span> len(generators):
+        <span class="kw">while</span> len(generators):
+            wake_up_time, idx, coro = heapq.heappop(generators)
+            now = time.time()
+            <span class="kw">if</span> wake_up_time &lt; now:
+                status, value = next(coro)
+                <span class="kw">if</span> status == <span class="str">"sleeping"</span>:
+                    <span class="kw">if</span> value &lt; sleep_time:
+                        sleep_time = value
+                    heapq.heappush(generators, (value + now, idx, coro))
+                <span class="kw">else</span>:
+                    values.append(value)
+            <span class="kw">else</span>:
+                heapq.heappush(generators, (wake_up_time, idx, coro))
+                sleep_time = wake_up_time - now
+                <span class="kw">break</span>
+        <span class="kw">if</span> len(generators):
+            time.sleep(sleep_time)
+
+    print(<span class="str">f"generated <span class="kw">{</span>len(values)<span class="kw">}</span> values"</span>)
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    res = []
+    test_points = [<span class="num">1</span>, <span class="num">10</span>, <span class="num">50</span>, <span class="num">100</span>, <span class="num">500</span>, <span class="num">1000</span>, <span class="num">2000</span>, <span class="num">5000</span>, <span class="num">10000</span>, <span class="num">20000</span>, <span class="num">50000</span>, <span class="num">100000</span>]
+    <span class="kw">for</span> r <span class="kw">in</span> test_points:
+        start = time.time()
+        schedule(r)
+        end = time.time()
+        print(<span class="str">"time taken"</span>, end - start)
+        res.append((r, end - start))
+
+    plt.plot([r <span class="kw">for</span> r, t <span class="kw">in</span> res], [t <span class="kw">for</span> r, t <span class="kw">in</span> res], marker=<span class="str">'o'</span>)
+    plt.xlabel(<span class="str">"Number of requests (r)"</span>)
+    plt.ylabel(<span class="str">"Time taken (seconds)"</span>)
+    plt.title(<span class="str">"Time vs Number of Requests"</span>)
+    plt.grid(<span class="kw">True</span>)
+    plt.savefig(<span class="str">"asynch.png"</span>)</code></pre>
+        </div>
+
+        <figure class="chart-figure">
+            <img src="assets/async-random.png"
+                alt="Generator-based async with random sleep — scaling benchmark with variable wait times">
+            <figcaption class="chart-caption">generator async with random sleep · scaling benchmark</figcaption>
+        </figure>
+
+        <p>
+            Each generator is placed in a min-heap keyed by its wake-up time. The scheduler iterates over the heap
+            and processes every generator that is ready to run. As soon as it encounters one that isn't ready, it stops
+            because all subsequent entries in the heap are also not ready. This avoids wasteful checks across all
+            <em>n</em> generators on every iteration.
+        </p>
+
+        <h2>How <code>asyncio</code> connects to this</h2>
+
+        <p>
+            This is loosely how coroutines, <code>async</code> functions, work in Python. The
+            <code>asyncio</code> library has a scheduler that queues all the coroutines. Consider the example below:
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · asyncio</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> asyncio
+
+<span class="kw">async def</span> <span class="fn">coro1</span>():
+    print(<span class="str">"coro1 sleeping"</span>)
+    <span class="kw">await</span> asyncio.sleep(<span class="num">1</span>)
+    print(<span class="str">"coro1 halfway done"</span>)
+    <span class="kw">await</span> asyncio.sleep(<span class="num">1</span>)
+    print(<span class="str">"coro1 done"</span>)
+
+<span class="kw">async def</span> <span class="fn">coro2</span>():
+    print(<span class="str">"coro2 sleeping"</span>)
+    <span class="kw">await</span> asyncio.sleep(<span class="num">1</span>)
+    print(<span class="str">"coro2 halfway done"</span>)
+    <span class="kw">await</span> asyncio.sleep(<span class="num">1</span>)
+    print(<span class="str">"coro2 done"</span>)
+
+<span class="kw">async def</span> <span class="fn">run</span>():
+    tasks = [coro1(), coro2()]
+    <span class="kw">await</span> asyncio.gather(*tasks)
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    asyncio.run(run())</code></pre>
+        </div>
+
+        <p>
+            <code>asyncio</code> adds both coroutines to a queue. It runs <code>coro1</code> until the first
+            <code>await</code> (which is analogous to <code>yield</code> in the generator example), then switches to
+            <code>coro2</code> and does the same. After 1 second it resumes them in order. In short, <code>await</code>
+            is the coroutine equivalent of <code>yield</code>. A coroutine runs until its next <code>await</code>,
+            then hands control back to the scheduler, which proceeds with other coroutines before returning.
+        </p>
+
+        <p>
+            The generator example is good to understand how coroutines work, but it uses an assumption that breaks in
+            the real world. We rely on the generator to tell the wait time upfront. However, if you're waiting for a
+            response from a URL,
+            you have no reliable way of knowing in advance how long the server will take. So the question becomes —
+            how does the scheduler know when to resume a coroutine? That's what we'll explore in the
+            <a href="async-http-blog.html">next post</a>.
+        </p>
+
+    </div>
+
+    <script>
+        function copyCode(btn) {
+            const pre = btn.closest('.code-block').querySelector('pre');
+            const text = pre.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 1800);
+            });
+        }
+    </script>
+
+</body>
+
+</html>

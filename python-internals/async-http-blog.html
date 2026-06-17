@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unraveling an Async HTTP Request</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,wght@0,300;0,600;1,300&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0f14;
+            --surface: #13161d;
+            --border: #1e2330;
+            --text: #c9cdd8;
+            --muted: #606578;
+            --accent: #5c9fff;
+            --accent-dim: rgba(92, 159, 255, 0.12);
+            --green: #4ecb71;
+            --red: #f07070;
+            --yellow: #e8c96d;
+            --font-display: 'Fraunces', Georgia, serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+            --font-code: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.75;
+            padding: 0 1rem;
+        }
+
+        .wrapper {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 4rem 0 6rem;
+        }
+
+        .hero {
+            margin-bottom: 3.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2.5rem;
+        }
+
+        .hero-eyebrow {
+            font-family: var(--font-code);
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 600;
+            line-height: 1.15;
+            color: #e8eaf2;
+            margin-bottom: 1.25rem;
+        }
+
+        .hero-sub {
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-family: var(--font-code);
+        }
+
+        p {
+            margin-bottom: 1.3rem;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 1.55rem;
+            font-weight: 600;
+            color: #e0e3ee;
+            margin: 2.8rem 0 0.9rem;
+            padding-top: 0.5rem;
+        }
+
+        h3 {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 300;
+            font-style: italic;
+            color: var(--accent);
+            margin: 2rem 0 0.6rem;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        li {
+            margin-left: 1.4rem;
+            margin-bottom: 0.45rem;
+        }
+
+        ul,
+        ol {
+            margin-bottom: 1.2rem;
+        }
+
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            overflow: hidden;
+            font-family: var(--font-code);
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background: var(--border);
+            font-size: 0.72rem;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .code-header .lang-badge {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--muted);
+            color: var(--muted);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: var(--font-code);
+            font-size: 0.68rem;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .copy-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .copy-btn.copied {
+            color: var(--green);
+            border-color: var(--green);
+        }
+
+        pre {
+            padding: 1.2rem 1.4rem;
+            overflow-x: auto;
+            font-size: 0.82rem;
+            line-height: 1.65;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .kw {
+            color: #c792ea;
+        }
+
+        .fn {
+            color: #82cfff;
+        }
+
+        .str {
+            color: #c3e88d;
+        }
+
+        .num {
+            color: var(--yellow);
+        }
+
+        .cmt {
+            color: #546e7a;
+            font-style: italic;
+        }
+
+        .exc {
+            color: #f07070;
+        }
+
+        code {
+            font-family: var(--font-code);
+            font-size: 0.82em;
+            background: var(--accent-dim);
+            color: #a8d4ff;
+            padding: 0.15em 0.45em;
+            border-radius: 4px;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+
+        .output-block {
+            background: #0a0c10;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--green);
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0 1.5rem;
+            padding: 1rem 1.2rem;
+            font-family: var(--font-code);
+            font-size: 0.8rem;
+            line-height: 1.7;
+            color: #9fb8a0;
+            overflow-x: auto;
+            white-space: pre-line;
+        }
+
+        .output-block.error {
+            border-left-color: var(--red);
+            color: #c09898;
+        }
+
+        .callout {
+            background: var(--accent-dim);
+            border: 1px solid rgba(92, 159, 255, 0.25);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.2rem;
+            margin: 1.5rem 0;
+            font-size: 0.92rem;
+            color: #b0c8ee;
+        }
+
+        .callout strong {
+            color: var(--accent);
+        }
+
+        .callout.warn {
+            background: rgba(232, 201, 109, 0.08);
+            border-color: rgba(232, 201, 109, 0.35);
+            border-left-color: var(--yellow);
+            color: #d6c090;
+        }
+
+        .callout.warn strong {
+            color: var(--yellow);
+        }
+
+        /* Flow diagram */
+        .flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin: 1.8rem 0;
+            font-family: var(--font-code);
+            font-size: 0.78rem;
+        }
+
+        .flow-row {
+            display: flex;
+            align-items: stretch;
+        }
+
+        .flow-actor {
+            width: 110px;
+            flex-shrink: 0;
+            padding: 0.45rem 0.6rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .flow-actor.app {
+            background: rgba(92, 159, 255, 0.13);
+            color: #7ab4ff;
+            border: 1px solid rgba(92, 159, 255, 0.25);
+        }
+
+        .flow-actor.kern {
+            background: rgba(78, 203, 113, 0.10);
+            color: #6ed98a;
+            border: 1px solid rgba(78, 203, 113, 0.22);
+        }
+
+        .flow-actor.net {
+            background: rgba(232, 201, 109, 0.10);
+            color: #d4ba78;
+            border: 1px solid rgba(232, 201, 109, 0.22);
+        }
+
+        .flow-arrow {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 0.6rem;
+            color: var(--muted);
+            font-size: 0.72rem;
+            position: relative;
+        }
+
+        .flow-arrow::before {
+            content: '';
+            display: block;
+            border-top: 1px dashed var(--border);
+            margin-bottom: 0.2rem;
+        }
+
+        .flow-label {
+            color: var(--text);
+            font-size: 0.72rem;
+        }
+
+        .flow-connector {
+            width: 110px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .flow-vline {
+            width: 2px;
+            background: var(--border);
+            flex: 1;
+            margin: 0 auto;
+        }
+
+        footer {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-family: var(--font-code);
+        }
+
+        footer a {
+            color: var(--muted);
+        }
+
+        @media (max-width: 500px) {
+            body {
+                font-size: 15px;
+            }
+
+            .wrapper {
+                padding: 2rem 0 4rem;
+            }
+
+            pre {
+                font-size: 0.73rem;
+            }
+
+            .flow-actor {
+                width: 72px;
+                font-size: 0.6rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+
+        <header class="hero">
+            <div class="hero-eyebrow">Deep Dive · Python Internals · Part 3</div>
+            <h1>Unraveling an Async HTTP Request</h1>
+            <p class="hero-sub">// From a blocking socket to an event-driven coroutine — no magic, just syscalls</p>
+        </header>
+
+        <p>
+            In the <a href="asyncio-blog.html">previous post</a>, we developed a toy coroutine scheduler using generators
+            and a sleep-based timer. We assumed that the coroutine could tell the scheduler
+            exactly how long to wait. In real network IO, there is no such promise. We need some other mechanism to
+            decide when to resume the generator.
+            In this post, let's take the example of a simple get request and understand how we can bridge the gap
+            between a
+            toy generator and a real async coroutine.
+        </p>
+
+        <h2>How your application talks to the network</h2>
+
+        <p>
+            Your application cannot communicate over the network directly. It must request the OS to do so. The OS
+            provides this capability through an abstraction called as <strong>socket</strong>. A socket is a structure
+            that enables bidirectional communication over the network between two nodes. When you create a socket, the
+            OS
+            returns <em>file descriptor</em> (an integer index) to refer to it. Later, you can use this index to
+            interact with the socket.
+        </p>
+
+        <p>Here is a simple HTTP fetch using raw sockets:</p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · blocking socket</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> socket
+
+<span class="kw">def</span> <span class="fn">fetch_data</span>():
+    host = <span class="str">"example.com"</span>
+    port = <span class="num">80</span>
+
+    <span class="cmt"># syscall: socket() — kernel allocates a socket and returns a file descriptor</span>
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    <span class="cmt"># syscall: connect() — kernel initiates the TCP three-way handshake:
+    # and blocks until the handshake completes.</span>
+    sock.connect((host, port))
+
+    request = (
+        <span class="str">"GET / HTTP/1.1\r\n"</span>
+        <span class="str">"Host: example.com\r\n"</span>
+        <span class="str">"Connection: close\r\n"</span>
+        <span class="str">"\r\n"</span>
+    )
+    <span class="cmt"># syscall: send() — kernel copies bytes to a buffer,
+    # then the NIC transmits them. Blocks until all bytes are handed off.</span>
+    sock.sendall(request.encode())
+
+    <span class="cmt"># syscall: recv() — blocks until the server sends data back</span>
+    response = <span class="str">b""</span>
+    <span class="kw">while True</span>:
+        chunk = sock.recv(<span class="num">4096</span>)
+        <span class="kw">if not</span> chunk:
+            <span class="kw">break</span>
+        response += chunk
+
+    sock.close()
+    <span class="kw">return</span> response.decode()
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    print(fetch_data())</code></pre>
+        </div>
+
+        <p>
+            Each step above involves a syscall. The application drops into kernel mode, the kernel does its work, and
+            only then returns execution to your code. The important thing to notice is that during all these calls, the
+            CPU is mostly idle.
+        </p>
+
+        <ul>
+            <li><strong>connect()</strong> — the CPU executes kernel code to build the TCP state
+                machine and fire off a SYN packet. Then it waits, idle, for the remote server to reply with
+                SYN-ACK.</li>
+            <li><strong>sendall()</strong> — the CPU copies bytes into the kernel buffer and passes it to
+                the Network Interface Card(NIC). The NIC takes over and the CPU is idle again.</li>
+            <li><strong>recv()</strong> — the CPU calls the kernel to check whether the socket received any data. If it
+                finds no data, it sleeps until the data arrives.</li>
+        </ul>
+
+        <p>
+            In all three cases the thread blocks. It cannot do anything else while it waits. Let's address this issue
+            first.
+        </p>
+
+        <h2>Non-blocking sockets</h2>
+
+        <p>
+            Sockets have a non-blocking mode. When a socket is set to non-blocking, all the syscalls that previously
+            blocked the thread would return immediately, but with an error code telling you "there's nothing ready yet,
+            try
+            again later." This gives the application the flexibility to proceed with other tasks and come back
+            (concurrecy).
+        </p>
+
+        <p>
+            In C, when a non-blocking syscall fails, it returns <code>-1</code> and sets <code>errno</code> to
+            <code>EAGAIN</code>
+            or <code>EWOULDBLOCK</code>. Python's socket library surfaces these errno values as exceptions,
+            <code>BlockingIOError</code>. It is not an error in the
+            traditional sense. It just indicates that the socket is not ready yet. We can catch this and treat it as a
+            signal to yield control.
+        </p>
+
+        <p>
+            Here is what the non-blocking version of the <code>fetch_data</code> function.
+            When we call <code>connect()</code>, the kernel starts the TCP handshake in the background and the
+            non-blocking socket immediately raises
+            <code>BlockingIOError</code> to signal that come back later. At this point, our generator can yield the
+            socket to the scheduler with a signal.
+            Essentially, it can inform the scheduler: "Hey, I have initiated the TCP handshake with this socket. Come
+            back to me when the socket is ready to write."
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · non-blocking + exceptions</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> socket
+<span class="kw">import</span> errno
+
+<span class="kw">def</span> <span class="fn">fetch_data</span>():
+    host = <span class="str">"example.com"</span>
+    port = <span class="num">80</span>
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setblocking(<span class="kw">False</span>)
+
+    <span class="cmt"># connect() on a non-blocking socket TYPICALLY raises BlockingIOError
+    # (errno EINPROGRESS) idicating that the kernel has started the
+    # TCP handshake but the application need not wait.</span>
+    <span class="kw">try</span>:
+        sock.connect((host, port))
+    <span class="kw">except</span> <span class="exc">BlockingIOError</span>:
+        <span class="kw">pass</span>  <span class="cmt"># expected — handshake is in progress in the background</span>
+
+    <span class="cmt"># Yield back to the scheduler. Tell it to resume once this
+    # socket is writable.</span>
+    <span class="kw">yield</span> sock, <span class="str">"write"</span>
+
+    <span class="cmt"># At this point the connection is established. Build the request.</span>
+    request = (
+        <span class="str">"GET / HTTP/1.1\r\n"</span>
+        <span class="str">"Host: example.com\r\n"</span>
+        <span class="str">"Connection: close\r\n"</span>
+        <span class="str">"\r\n"</span>
+    )
+
+    <span class="cmt"># sendall() on a non-blocking socket can raise BlockingIOError if the
+    # kernel send buffer is full. We retry in a loop until all bytes are sent.</span>
+    data = request.encode()
+    <span class="kw">while</span> data:
+        <span class="kw">try</span>:
+            sent = sock.send(data)
+            data = data[sent:]
+        <span class="kw">except</span> <span class="exc">BlockingIOError</span>:
+            <span class="cmt"># Buffer full — yield and wait for the socket to become writable again</span>
+            <span class="kw">yield</span> sock, <span class="str">"write"</span>
+
+    <span class="cmt"># Tell the scheduler: "resume me once this socket has data to read"</span>
+    <span class="kw">yield</span> sock, <span class="str">"read"</span>
+
+    <span class="cmt"># Read the response. recv() on a non-blocking socket raises BlockingIOError
+    # if no data is available yet. We yield and wait for another read event.</span>
+    response = <span class="str">b""</span>
+    <span class="kw">while True</span>:
+        <span class="kw">try</span>:
+            chunk = sock.recv(<span class="num">4096</span>)
+            <span class="kw">if not</span> chunk:
+                <span class="kw">break</span>  <span class="cmt"># empty bytes = server closed the connection</span>
+            response += chunk
+        <span class="kw">except</span> <span class="exc">BlockingIOError</span>:
+            <span class="cmt"># No data yet — yield and wait for the next read event</span>
+            <span class="kw">yield</span> sock, <span class="str">"read"</span>
+
+    sock.close()
+    <span class="kw">return</span> response.decode()</code></pre>
+        </div>
+
+        <p>
+            Similarly, the generator can trigger other non-blocking syscalls and yield back to the scheduler.
+            Each <code>yield</code> is now a contract between the generator and its scheduler: "I'm pausing here —
+            resume me when <em>this specific event</em> fires on <em>this specific socket</em>." But the scheduler
+            still needs a mechanism to know when that event actually fires.
+        </p>
+
+        <h2>Letting the OS monitor the sockets for us: <code>select</code> / <code>epoll</code></h2>
+
+        <p>
+            The kernel provides multiple syscalls, <code>select</code>, <code>poll</code>,
+            <code>epoll</code> (Linux), <code>kqueue</code> (macOS/BSD), that let an application hand a list of
+            file descriptors to the kernel and request: "please notify me when any of these are ready." Note that the
+            kernel
+            does not waste CPU cycles to continuously monitor the file descriptors (sockets in this context) for an
+            event.
+            It prompts the application only when a desired event is triggered within the socket.
+        </p>
+
+        <p>
+            Python's <code>selectors</code> module provides all the necessary abstractions for this communication with
+            the kernel.
+            It automatically picks the best mechanism available on the current OS (<code>epoll</code> on Linux,
+            <code>kqueue</code> on macOS). We can use it to build the scheduler.
+        </p>
+
+        <p>
+            At each <code>yield</code>, <code>fetch_data</code> hands the scheduler a
+            <code>(socket, event)</code> pair. The scheduler registers that socket with the selector and then
+            calls <code>sel.select()</code>, which blocks until the OS reports that one or more of the registered
+            sockets are ready. No busy-waiting, no polling loop — the process is genuinely idle between events.
+        </p>
+
+        <p>Here is the updated generator with <code>selectors</code> constants replacing the bare strings:</p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · fetch_data with selectors</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> socket
+<span class="kw">import</span> selectors
+
+<span class="kw">def</span> <span class="fn">fetch_data</span>():
+    host = <span class="str">"example.com"</span>
+    port = <span class="num">80</span>
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setblocking(<span class="kw">False</span>)
+
+    <span class="kw">try</span>:
+        sock.connect((host, port))
+    <span class="kw">except</span> <span class="exc">BlockingIOError</span>:
+        <span class="kw">pass</span>
+
+    <span class="cmt"># Yield the socket and the event the scheduler should wait for.
+    # EVENT_WRITE fires once the TCP handshake completes and the
+    # connection is ready to accept data.</span>
+    <span class="kw">yield</span> sock, selectors.EVENT_WRITE
+
+    request = (
+        <span class="str">"GET / HTTP/1.1\r\n"</span>
+        <span class="str">"Host: example.com\r\n"</span>
+        <span class="str">"Connection: close\r\n"</span>
+        <span class="str">"\r\n"</span>
+    )
+    data = request.encode()
+    <span class="kw">while</span> data:
+        <span class="kw">try</span>:
+            sent = sock.send(data)
+            data = data[sent:]
+        <span class="kw">except</span> <span class="exc">BlockingIOError</span>:
+            <span class="kw">yield</span> sock, selectors.EVENT_WRITE
+
+    <span class="cmt"># EVENT_READ fires once the server has sent at least some response bytes</span>
+    <span class="kw">yield</span> sock, selectors.EVENT_READ
+
+    response = <span class="str">b""</span>
+    <span class="kw">while True</span>:
+        <span class="kw">try</span>:
+            chunk = sock.recv(<span class="num">4096</span>)
+            <span class="kw">if not</span> chunk:
+                <span class="kw">break</span>
+            response += chunk
+        <span class="kw">except</span> <span class="exc">BlockingIOError</span>:
+            <span class="kw">yield</span> sock, selectors.EVENT_READ
+
+    sock.close()
+    <span class="kw">return</span> response.decode()</code></pre>
+        </div>
+
+        <h2>The scheduler</h2>
+
+        <p>
+            The scheduler's job is to run a generator until it terminates with a valid response (raises StopIteration).
+            It registers the
+            <code>(socket, event)</code> pair with the selector and resumes the generator when the kernel notifies that
+            the event has fired.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · selector-based scheduler</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">import</span> selectors
+
+<span class="kw">def</span> <span class="fn">run</span>(gen_func):
+    <span class="cmt"># Instantiate the generator.</span>
+    gen = gen_func()
+
+    <span class="cmt"># Ask the OS for the best available IO multiplexing mechanism
+    # (epoll on Linux, kqueue on macOS).</span>
+    sel = selectors.DefaultSelector()
+
+    <span class="cmt"># Run the generator to its first yield to get
+    # the initial (socket, event) pair.</span>
+    <span class="kw">try</span>:
+        sock, event = next(gen)
+    <span class="kw">except</span> <span class="exc">StopIteration</span>:
+        <span class="kw">return</span>  <span class="cmt"># generator finished synchronously with no IO — unusual but valid</span>
+
+    <span class="cmt"># Register the socket. Attach the generator itself as metadata
+    # so we can retrieve it when the event fires.</span>
+    sel.register(sock, event, data=gen)
+
+    <span class="kw">while True</span>:
+        <span class="cmt"># sel.select() BLOCKS here. The process is idle.
+        # The OS wakes the application only when one of the registered sockets
+        # has the event it asked for.</span>
+        ready = sel.select()
+
+        <span class="kw">for</span> key, mask <span class="kw">in</span> ready:
+            gen = key.data
+            sel.unregister(key.fileobj)
+
+            <span class="kw">try</span>:
+                <span class="cmt"># Resume the generator — it runs until the next yield</span>
+                sock, event = next(gen)
+                <span class="cmt"># Re-register for the new event the generator is now waiting on</span>
+                sel.register(sock, event, data=gen)
+
+            <span class="kw">except</span> <span class="exc">StopIteration</span> <span class="kw">as</span> e:
+                <span class="cmt"># Generator exhausted — e.value holds the return value</span>
+                print(<span class="str">"Response received!"</span>)
+                print(e.value[:<span class="num">500</span>])
+                sel.close()
+                <span class="kw">return</span>
+
+        <span class="kw">if not</span> sel.get_map():
+            sel.close()
+            <span class="kw">break</span>
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    run(fetch_data)</code></pre>
+        </div>
+
+        <h2>Putting it all together</h2>
+
+        <p>
+            Let's trace through exactly what happens when <code>run(fetch_data)</code> is called, step by step:
+        </p>
+
+        <ol>
+            <li><strong>Generator created.</strong> <code>fetch_data()</code> returns a generator object. No code
+                inside <code>fetch_data</code> has run yet.</li>
+            <li><strong>First <code>next()</code>.</strong> The generator runs until the first <code>yield</code>:
+                it creates a socket object, calls <code>connect()</code>, catches the <code>BlockingIOError</code>, and
+                yields <code>(sock, EVENT_WRITE)</code>. The TCP handshake runs in the background.</li>
+            <li><strong>Register with selector.</strong> The scheduler registers the socket for
+                <code>EVENT_WRITE</code> and calls <code>sel.select()</code>.
+            </li>
+            <li><strong>Kernel wakes us up.</strong> When the server completes the handshake and the connection is
+                established, the kernel marks the socket writable and <code>sel.select()</code> returns.</li>
+            <li><strong>Resume generator.</strong> The scheduler calls <code>next(gen)</code> again. The generator
+                sends the HTTP request and yields <code>(sock, EVENT_READ)</code>. The scheduler registers for the
+                read event and sleeps again.</li>
+            <li><strong>Response arrives.</strong> The server sends data back. The kernel marks the socket readable.
+                <code>sel.select()</code> returns. The generator resumes, reads all available chunks, and
+                eventually <code>return</code>s the full response.
+            </li>
+            <li><strong><code>StopIteration</code>.</strong> The scheduler catches the exception, extracts
+                <code>e.value</code> (the return value of the generator), prints it, and exits.
+            </li>
+        </ol>
+
+        <h2>Extending to multiple concurrent requests</h2>
+
+        <p>
+            We can extend the above scheduler to handle multiple concurrent requests. We will use a dict to maintain a
+            mapping
+            between a generator and its socket. When a socket becomes ready, we resume its corresponding generator.
+        </p>
+
+        <div class="code-block">
+            <div class="code-header">
+                <span class="lang-badge">Python · multi-coroutine scheduler</span>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>
+            <pre><code><span class="kw">def</span> <span class="fn">run_all</span>(gen_funcs):
+    <span class="str">"""Run multiple fetch_data generators concurrently on a single thread."""</span>
+    sel = selectors.DefaultSelector()
+
+    <span class="cmt"># Kick off all generators and register their initial (sock, event) pairs</span>
+    <span class="kw">for</span> gen_func <span class="kw">in</span> gen_funcs:
+        gen = gen_func()
+        <span class="kw">try</span>:
+            sock, event = next(gen)
+            sel.register(sock, event, data=gen)
+        <span class="kw">except</span> <span class="exc">StopIteration</span>:
+            <span class="kw">pass</span>  <span class="cmt"># finished synchronously</span>
+
+    <span class="kw">while</span> sel.get_map():
+        <span class="cmt"># Block until any registered socket has an event</span>
+        ready = sel.select()
+
+        <span class="kw">for</span> key, mask <span class="kw">in</span> ready:
+            gen = key.data
+            sel.unregister(key.fileobj)
+
+            <span class="kw">try</span>:
+                sock, event = next(gen)
+                sel.register(sock, event, data=gen)
+            <span class="kw">except</span> <span class="exc">StopIteration</span> <span class="kw">as</span> e:
+                print(<span class="str">f"Done: <span class="kw">{</span>e.value[:<span class="num">80</span>]<span class="kw">}</span>..."</span>)
+
+    sel.close()
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    <span class="cmt"># Fire off 5 concurrent fetches — all on one thread</span>
+    run_all([fetch_data] * <span class="num">5</span>)</code></pre>
+        </div>
+
+        <p>
+            All the requests are in-flight simultaneously. Each is blocked on its own network event. The single
+            application thread sleeps inside <code>sel.select()</code> and is woken up exactly when the kernel
+            notifies it about an event in a socket. This is the core of what <code>asyncio</code>'s event loop does. It
+            is this pattern, built with better error handling and cleaner abstractions.
+        </p>
+
+        <div class="callout warn">
+            <strong>Scaling to thousands of sockets</strong><br><br>
+            In the previous post, we scaled the program to run up to 20k generators concurrently. There, each generator
+            was
+            simply sleeping for a second and consumed very few resources. The same is not true here.
+            <ul>
+                <li>Every generator
+            creates a socket which consumes memory. The OS also puts a hard limit on how many open sockets can exist in
+            a process at a time. It defaults to 1024 on linux.</li>
+                <li>Unlike the previous program where the CPU was
+            just called to generate a random integer,
+            the CPU does more work here. Granted, the bottleneck is IO. But the CPU is still required to run kernel
+            code that builds the packets for TCP connections, copies buffers, processes incoming data etc.</li>
+                <li>Every TCP connection is identified with (local IP, local port, remote IP, remote port), and
+            a client machine has a around 28k-60k ports.
+            So, even if you increase the limit on open sockets,
+            a single local IP address has only 28k-60K available ports.</li>
+                <li>The hardware, how many connections your NIC, can
+            handle is
+            a limitation as well.</li>
+                <li>Most importantly, the remote server must be able to handle the incoming load. If the server processes
+            requests serially,
+            there is nothing the client can do to improve throughput. The example.com server used in this article is
+            certainly not
+            designed to handle tens of thousands of concurrent requests from a single client. Production services that
+            can handle
+            such traffic will likely enforce rate limiting long before you reach those numbers.</li>
+            </ul>
+        </div>
+
+        <p>
+            In a future post, we'll try and dissect the abstractions provided by the asyncio library.
+        </p>
+
+    </div>
+
+    <script>
+        function copyCode(btn) {
+            const pre = btn.closest('.code-block').querySelector('pre');
+            const text = pre.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 1800);
+            });
+        }
+    </script>
+
+</body>
+
+</html>
